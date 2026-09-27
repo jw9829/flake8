@@ -79,7 +79,12 @@ class Application:
             self.options, self.formatter,
         )
 
-    def make_file_checker_manager(self, argv: Sequence[str]) -> None:
+    def make_file_checker_manager(
+        self,
+        argv: Sequence[str],
+        *,
+        worker_options: argparse.Namespace | None = None,
+    ) -> None:
         """Initialize our FileChecker Manager."""
         assert self.guide is not None
         assert self.plugins is not None
@@ -87,6 +92,7 @@ class Application:
             style_guide=self.guide,
             plugins=self.plugins.checkers,
             argv=argv,
+            worker_options=worker_options,
         )
 
     def run_checks(self) -> None:

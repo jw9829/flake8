@@ -61,7 +61,9 @@ def _mp_prefork(
         _mp = None
 
 
-def _mp_init(argv: Sequence[str]) -> None:
+def _mp_init(
+    argv: Sequence[str], options: argparse.Namespace | None = None,
+) -> None:
     global _mp
 
     # Ensure correct signaling of ^C using multiprocessing.Pool.
@@ -69,8 +71,9 @@ def _mp_init(argv: Sequence[str]) -> None:
 
     # for `fork` this'll already be set
     if _mp is None:
-        plugins, options = parse_args(argv)
-        _mp = plugins.checkers, options
+        plugins, parsed_options = parse_args(argv)
+        worker_options = options if options is not None else parsed_options
+        _mp = plugins.checkers, worker_options
 
 
 def _mp_run(filename: str) -> tuple[str, Results, dict[str, int]]:
@@ -105,6 +108,7 @@ class Manager:
         style_guide: StyleGuideManager,
         plugins: Checkers,
         argv: Sequence[str],
+        worker_options: argparse.Namespace | None = None,
     ) -> None:
         """Initialize our Manager instance."""
         self.style_guide = style_guide
@@ -119,6 +123,7 @@ class Manager:
         }
         self.exclude = (*self.options.exclude, *self.options.extend_exclude)
         self.argv = argv
+        self.worker_options = worker_options
         self.results: list[tuple[str, Results, dict[str, int]]] = []
 
     def _process_statistics(self) -> None:
@@ -192,7 +197,9 @@ class Manager:
     def run_parallel(self) -> None:
         """Run the checkers in parallel."""
         with _mp_prefork(self.plugins, self.options):
-            pool = _try_initialize_processpool(self.jobs, self.argv)
+            pool = _try_initialize_processpool(
+                self.jobs, self.argv, self.worker_options,
+            )
 
         if pool is None:
             self.run_serial()
@@ -547,10 +554,12 @@ class FileChecker:
 def _try_initialize_processpool(
     job_count: int,
     argv: Sequence[str],
+    options: argparse.Namespace | None = None,
 ) -> multiprocessing.pool.Pool | None:
     """Return a new process pool instance if we are able to create one."""
     try:
-        return multiprocessing.Pool(job_count, _mp_init, initargs=(argv,))
+        initargs = (argv,) if options is None else (argv, options)
+        return multiprocessing.Pool(job_count, _mp_init, initargs=initargs)
     except OSError as err:
         if err.errno not in SERIAL_RETRY_ERRNOS:
             raise
