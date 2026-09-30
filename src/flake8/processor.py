@@ -360,11 +360,33 @@ class FileProcessor:
             True if a line matches :attr:`defaults.NOQA_FILE`,
             otherwise False
         """
+        noqa_lines = [
+            lineno
+            for lineno, line in enumerate(self.lines)
+            if defaults.NOQA_FILE.search(line)
+        ]
+        if not noqa_lines:
+            return False
+
+        try:
+            comment_lines = {
+                token.start[0] - 1
+                for token in self.file_tokens
+                if token.type == tokenize.COMMENT
+                and token.start[0] - 1 in noqa_lines
+            }
+        except (SyntaxError, tokenize.TokenError):
+            comment_lines = set(noqa_lines)
+
         if not self.options.disable_noqa and any(
-            defaults.NOQA_FILE.match(line) for line in self.lines
+            defaults.NOQA_FILE.match(self.lines[lineno])
+            for lineno in comment_lines
         ):
             return True
-        elif any(defaults.NOQA_FILE.search(line) for line in self.lines):
+        elif any(
+            defaults.NOQA_FILE.search(self.lines[lineno])
+            for lineno in comment_lines
+        ):
             LOG.warning(
                 "Detected `flake8: noqa` on line with code. To ignore an "
                 "error on a line use `noqa` instead.",

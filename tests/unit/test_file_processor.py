@@ -78,12 +78,26 @@ def test_strip_utf_bom(first_line, default_options):
         (["#!/usr/bin/python", "a = 1", "# flake8:noqa"], True),
         (["#!/usr/bin/python", "a = 1  # flake8: noqa"], False),
         (["#!/usr/bin/python", "a = 1  # flake8:noqa"], False),
+        (
+            [
+                '"""Module documentation.\n',
+                "# flake8: noqa\n",
+                '"""\n',
+            ],
+            False,
+        ),
     ],
 )
 def test_should_ignore_file(lines, expected, default_options):
     """Verify that we ignore a file if told to."""
     file_processor = processor.FileProcessor("-", default_options, lines)
     assert file_processor.should_ignore_file() is expected
+
+
+def test_should_ignore_file_when_tokenization_fails(default_options):
+    lines = ['"""Unterminated string\n', "# flake8: noqa\n"]
+    file_processor = processor.FileProcessor("-", default_options, lines)
+    assert file_processor.should_ignore_file() is True
 
 
 def test_should_ignore_file_to_handle_disable_noqa(default_options):
